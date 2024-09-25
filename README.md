@@ -1,0 +1,42 @@
+# Email and password example with 2FA in Astro
+
+Built with SQLite.
+
+- Password check with HaveIBeenPwned
+- Email verification
+- 2FA with TOTP
+- 2FA recovery codes
+- Password reset
+- Login throttling and rate limiting
+
+Emails are just logged to the console. Rate limiting is implemented using JavaScript `Map`.
+
+## Initialize project
+
+Create `sqlite.db` and run `setup.sql`.
+
+```
+sqlite3 sqlite.db
+```
+
+Create a .env file. Generate a 128 bit (16 byte) string, base64 encode it, and set it as `ENCRYPTION_KEY`.
+
+```bash
+ENCRYPTION_KEY="L9pmqRJnO1ZJSQ2svbHuBA=="
+```
+
+> You can use OpenSSL to quickly generate a secure key.
+>
+> ```bash
+> openssl rand --base64 16
+> ```
+
+Run the application:
+
+```
+pnpm dev
+```
+
+## User enumeration
+
+We do not consider user enumeration to be a real vulnerability so please don't open issues on it. If you really need to prevent it, just don't use emails.

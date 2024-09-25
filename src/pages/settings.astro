@@ -1,0 +1,131 @@
+---
+import { getUserRecoverCode } from "@lib/server/user";
+
+if (Astro.locals.user === null || Astro.locals.session === null) {
+	return Astro.redirect("/login");
+}
+if (Astro.locals.user.registered2FA && !Astro.locals.session.twoFactorVerified) {
+	return Astro.redirect("/2fa");
+}
+let recoveryCode: string | null = null;
+if (Astro.locals.user.registered2FA) {
+	recoveryCode = getUserRecoverCode(Astro.locals.user.id);
+}
+---
+
+<html lang="en">
+	<head>
+		<title>Email and password example with 2FA in Astro</title>
+	</head>
+	<body>
+		<header>
+			<a href="/">Home</a>
+			<a href="/settings">Settings</a>
+		</header>
+		<main>
+			<h1>Settings</h1>
+			<section>
+				<h2>Update email</h2>
+				<p>Your email: {Astro.locals.user.email}</p>
+				<form id="form-email">
+					<label for="form-email.email">New email</label>
+					<input type="email" id="form-email.email" name="email" required /><br />
+					<button>Update</button>
+					<p id="form-email.message"></p>
+				</form>
+			</section>
+			<section>
+				<h2>Update password</h2>
+				<form id="form-password">
+					<label for="form-password.password">Current password</label>
+					<input type="password" id="form-email.password" name="password" autocomplete="current-password" required /><br
+					/>
+					<label for="form-password.new-password">New password</label>
+					<input
+						type="password"
+						id="form-password.new-password"
+						name="new-password"
+						autocomplete="new-password"
+						required
+					/><br />
+					<button>Update</button>
+					<p id="form-password.message"></p>
+				</form>
+			</section>
+			{
+				Astro.locals.user.registered2FA && (
+					<section>
+						<h2>Update two-factor authentication</h2>
+						<a href="/2fa/setup">Update</a>
+					</section>
+				)
+			}
+			{
+				recoveryCode !== null && (
+					<section>
+						<h1>Recovery code</h1>
+						<p id="recovery-code">Your recovery code is: {recoveryCode}</p>
+						<button id="button-generate-recovery-code">Generate new code</button>
+					</section>
+				)
+			}
+		</main>
+	</body>
+</html>
+
+<script>
+	const emailFormElement = document.getElementById("form-email") as HTMLFormElement;
+	const emailFormErrorElement = document.getElementById("form-email.message") as HTMLElement;
+
+	emailFormElement.addEventListener("submit", async (e) => {
+		e.preventDefault();
+		const formData = new FormData(e.target as HTMLFormElement);
+		const data = {
+			email: formData.get("email")
+		};
+		const response = await fetch("/api/email-verification", {
+			method: "POST",
+			body: JSON.stringify(data)
+		});
+		if (response.ok) {
+			window.location.href = "/verify-email";
+		} else {
+			emailFormErrorElement.innerText = await response.text();
+		}
+	});
+
+	const passwordFormElement = document.getElementById("form-password") as HTMLFormElement;
+	const passwordFormErrorElement = document.getElementById("form-password.message") as HTMLElement;
+
+	passwordFormElement.addEventListener("submit", async (e) => {
+		e.preventDefault();
+		const formData = new FormData(e.target as HTMLFormElement);
+		const data = {
+			password: formData.get("password"),
+			new_password: formData.get("new-password")
+		};
+		const response = await fetch("/api/user/password", {
+			method: "PATCH",
+			body: JSON.stringify(data)
+		});
+		if (response.ok) {
+			passwordFormErrorElement.innerText = "Your password was updated.";
+		} else {
+			passwordFormErrorElement.innerText = await response.text();
+		}
+	});
+
+	const generateRecoveryCodeButtonElement = document.getElementById(
+		"button-generate-recovery-code"
+	) as HTMLButtonElement;
+	const recoveryCodeElement = document.getElementById("recovery-code") as HTMLElement;
+	generateRecoveryCodeButtonElement.addEventListener("click", async () => {
+		const response = await fetch("/api/user/recovery-code/reset", {
+			method: "POST"
+		});
+		if (response.ok) {
+			const recoveryCode = await response.text();
+			recoveryCodeElement.innerText = `Your recovery code is: ${recoveryCode}`;
+		}
+	});
+</script>

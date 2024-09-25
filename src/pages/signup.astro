@@ -1,0 +1,61 @@
+---
+if (Astro.locals.session !== null && Astro.locals.user !== null) {
+	if (!Astro.locals.user.emailVerified) {
+		return Astro.redirect("/verify-email");
+	}
+	if (!Astro.locals.user.registered2FA) {
+		return Astro.redirect("/2fa/setup");
+	}
+	if (!Astro.locals.session.twoFactorVerified) {
+		return Astro.redirect("/2fa");
+	}
+	return Astro.redirect("/");
+}
+---
+
+<html>
+	<head>
+		<title>Email and password example with 2FA in Astro</title>
+	</head>
+	<body>
+		<main>
+			<h1>Create an account</h1>
+			<p>Your username must be at least 3 characters long and your password must be at least 8 characters long.</p>
+			<form id="form-signup">
+				<label for="form-signup.username">Username</label>
+				<input id="form-signup.username" name="username" required /><br />
+				<label for="form-signup.email">Email</label>
+				<input type="email" id="form-signup.email" name="email" autocomplete="username" required /><br />
+				<label for="form-signup.password">Password</label>
+				<input type="password" id="form-signup.password" name="password" autocomplete="new-password" required /><br />
+				<button>Continue</button>
+				<p id="form-signup.message"></p>
+			</form>
+			<a href="/login">Sign in</a>
+		</main>
+	</body>
+</html>
+
+<script>
+	const formElement = document.getElementById("form-signup") as HTMLFormElement;
+	const formErrorElement = document.getElementById("form-signup.message") as HTMLElement;
+
+	formElement.addEventListener("submit", async (e) => {
+		e.preventDefault();
+		const formData = new FormData(e.target as HTMLFormElement);
+		const data = {
+			email: formData.get("email"),
+			username: formData.get("username"),
+			password: formData.get("password")
+		};
+		const response = await fetch("/api/user", {
+			method: "POST",
+			body: JSON.stringify(data)
+		});
+		if (response.ok) {
+			window.location.href = "/verify-email";
+		} else {
+			formErrorElement.innerText = await response.text();
+		}
+	});
+</script>
