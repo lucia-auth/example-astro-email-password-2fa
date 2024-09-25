@@ -49,7 +49,7 @@ export async function POST(context: APIContext): Promise<Response> {
 	await updateUserPassword(passwordResetSession.userId, password);
 
 	const sessionFlags: SessionFlags = {
-		twoFactorVerified: true
+		twoFactorVerified: passwordResetSession.twoFactorVerified,
 	};
 	const sessionToken = generateSessionToken();
 	const session = createSession(sessionToken, user.id, sessionFlags);
