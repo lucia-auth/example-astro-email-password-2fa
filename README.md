@@ -37,6 +37,9 @@ Run the application:
 pnpm dev
 ```
 
-## User enumeration
+## Notes
 
-We do not consider user enumeration to be a real vulnerability so please don't open issues on it. If you really need to prevent it, just don't use emails.
+- We do not consider user enumeration to be a real vulnerability so please don't open issues on it. If you really need to prevent it, just don't use emails.
+- This example does not handle unexpected errors gracefully.
+- There are some major code duplications (specifically for 2FA) to keep the codebase simple.
+- TODO: You may need to rewrite some queries and use transactions to avoid race conditions when using MySQL, Postgres, etc.
