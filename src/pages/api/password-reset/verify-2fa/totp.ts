@@ -13,11 +13,17 @@ export async function POST(context: APIContext): Promise<Response> {
 			status: 401
 		});
 	}
+	if (!totpBucket.check(session.userId, 1)) {
+		return new Response("Too many requests", {
+			status: 429
+		});
+	}
 	if (!session.twoFactorVerified || !session.emailVerified || !user.registered2FA) {
 		return new Response("forbidden", {
 			status: 403
 		});
 	}
+
 	const data: unknown = await context.request.json();
 	const parser = new ObjectParser(data);
 	let code: string;
@@ -39,7 +45,7 @@ export async function POST(context: APIContext): Promise<Response> {
 			status: 400
 		});
 	}
-	if (!totpBucket.check(session.userId, 1)) {
+	if (!totpBucket.consume(session.userId, 1)) {
 		return new Response("Too many requests", {
 			status: 429
 		});

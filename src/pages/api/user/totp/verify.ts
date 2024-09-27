@@ -27,6 +27,7 @@ export async function POST(context: APIContext): Promise<Response> {
 			status: 429
 		});
 	}
+
 	const data: unknown = await context.request.json();
 	const parser = new ObjectParser(data);
 	let code: string;
@@ -42,10 +43,15 @@ export async function POST(context: APIContext): Promise<Response> {
 			status: 400
 		});
 	}
+	if (!totpBucket.consume(context.locals.user.id, 1)) {
+		return new Response("Too many requests", {
+			status: 429
+		});
+	}
 	const totpKey = getUserTOTPKey(context.locals.user.id);
 	if (totpKey === null) {
-		return new Response("Please set up two-factor authentication.", {
-			status: 400
+		return new Response(null, {
+			status: 403
 		});
 	}
 	if (!verifyTOTP(totpKey, 30, 6, code)) {

@@ -7,9 +7,22 @@ export class ConstantRefillTokenBucket<_Key> {
 		this.refillIntervalSeconds = refillIntervalSeconds;
 	}
 
-	private storage = new Map<_Key, Bucket>();
+	private storage = new Map<_Key, RefillBucket>();
 
 	public check(key: _Key, cost: number): boolean {
+		const bucket = this.storage.get(key) ?? null;
+		if (bucket === null) {
+			return true;
+		}
+		const now = Date.now();
+		const refill = Math.floor((now - bucket.refilledAt) / (this.refillIntervalSeconds * 1000));
+		if (refill > 0) {
+			return Math.min(bucket.count + refill, this.max) >= cost;
+		}
+		return bucket.count >= cost;
+	}
+
+	public consume(key: _Key, cost: number): boolean {
 		let bucket = this.storage.get(key) ?? null;
 		const now = Date.now();
 		if (bucket === null) {
@@ -44,16 +57,7 @@ export class Throttler<_Key> {
 		this.timeoutSeconds = timeoutSeconds;
 	}
 
-	public check(key: _Key): boolean {
-		let counter = this.storage.get(key) ?? null;
-		const now = Date.now();
-		if (counter === null) {
-			return true;
-		}
-		return now - counter.updatedAt >= this.timeoutSeconds[counter.timeout] * 1000;
-	}
-
-	public increment(key: _Key): void {
+	public consume(key: _Key): boolean {
 		let counter = this.storage.get(key) ?? null;
 		const now = Date.now();
 		if (counter === null) {
@@ -62,11 +66,16 @@ export class Throttler<_Key> {
 				updatedAt: now
 			};
 			this.storage.set(key, counter);
-			return;
+			return true;
+		}
+		const allowed = now - counter.updatedAt >= this.timeoutSeconds[counter.timeout] * 1000;
+		if (!allowed) {
+			return false;
 		}
 		counter.updatedAt = now;
 		counter.timeout = Math.min(counter.timeout + 1, this.timeoutSeconds.length - 1);
 		this.storage.set(key, counter);
+		return true;
 	}
 
 	public reset(key: _Key): void {
@@ -74,29 +83,41 @@ export class Throttler<_Key> {
 	}
 }
 
-export class FixedRefillTokenBucket<_Key> {
+export class ExpiringTokenBucket<_Key> {
 	public max: number;
-	public refillIntervalSeconds: number;
+	public expiresInSeconds: number;
 
-	private storage = new Map<_Key, Bucket>();
+	private storage = new Map<_Key, ExpiringBucket>();
 
-	constructor(max: number, refillIntervalSeconds: number) {
+	constructor(max: number, expiresInSeconds: number) {
 		this.max = max;
-		this.refillIntervalSeconds = refillIntervalSeconds;
+		this.expiresInSeconds = expiresInSeconds;
 	}
 
 	public check(key: _Key, cost: number): boolean {
+		const bucket = this.storage.get(key) ?? null;
+		const now = Date.now();
+		if (bucket === null) {
+			return true;
+		}
+		if (now - bucket.createdAt >= this.expiresInSeconds * 1000) {
+			return true;
+		}
+		return bucket.count >= cost;
+	}
+
+	public consume(key: _Key, cost: number): boolean {
 		let bucket = this.storage.get(key) ?? null;
 		const now = Date.now();
 		if (bucket === null) {
 			bucket = {
 				count: this.max - cost,
-				refilledAt: now
+				createdAt: now
 			};
 			this.storage.set(key, bucket);
 			return true;
 		}
-		if (now - bucket.refilledAt >= this.refillIntervalSeconds * 1000) {
+		if (now - bucket.createdAt >= this.expiresInSeconds * 1000) {
 			bucket.count = this.max;
 		}
 		if (bucket.count < cost) {
@@ -113,9 +134,14 @@ export class FixedRefillTokenBucket<_Key> {
 	}
 }
 
-interface Bucket {
+interface RefillBucket {
 	count: number;
 	refilledAt: number;
+}
+
+interface ExpiringBucket {
+	count: number;
+	createdAt: number;
 }
 
 interface ThrottlingCounter {

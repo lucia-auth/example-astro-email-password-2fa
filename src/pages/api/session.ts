@@ -2,7 +2,7 @@ import { ObjectParser } from "@pilcrowjs/object-parser";
 import { verifyPasswordHash } from "@lib/server/password";
 import { createSession, generateSessionToken, setSessionTokenCookie } from "@lib/server/session";
 import { verifyEmailInput } from "@lib/server/email";
-import { Throttler } from "@lib/server/rate-limit";
+import { ConstantRefillTokenBucket, Throttler } from "@lib/server/rate-limit";
 import { getUserFromEmail, getUserPasswordHash } from "@lib/server/user";
 import { invalidateSession, deleteSessionTokenCookie } from "@lib/server/session";
 
@@ -10,8 +10,17 @@ import type { APIContext } from "astro";
 import type { SessionFlags } from "@lib/server/session";
 
 const throttler = new Throttler<number>([0, 1, 2, 4, 8, 16, 30, 60, 180, 300]);
+const ipBucket = new ConstantRefillTokenBucket<string>(20, 1);
 
 export async function POST(context: APIContext): Promise<Response> {
+	// TODO: Assumes X-Forwarded-For is always included.
+	const clientIP = context.request.headers.get("X-Forwarded-For");
+	if (clientIP !== null && !ipBucket.check(clientIP, 1)) {
+		return new Response("Too many requests", {
+			status: 429
+		});
+	}
+
 	const data: unknown = await context.request.json();
 	const parser = new ObjectParser(data);
 	let email: string, password: string;
@@ -39,7 +48,12 @@ export async function POST(context: APIContext): Promise<Response> {
 			status: 400
 		});
 	}
-	if (!throttler.check(user.id)) {
+	if (clientIP !== null && !ipBucket.consume(clientIP, 1)) {
+		return new Response("Too many requests", {
+			status: 429
+		});
+	}
+	if (!throttler.consume(user.id)) {
 		return new Response("Too many request", {
 			status: 429
 		});
@@ -47,7 +61,6 @@ export async function POST(context: APIContext): Promise<Response> {
 	const passwordHash = getUserPasswordHash(user.id);
 	const validPassword = await verifyPasswordHash(passwordHash, password);
 	if (!validPassword) {
-		throttler.increment(user.id);
 		return new Response("Invalid password", {
 			status: 400
 		});

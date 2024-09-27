@@ -28,6 +28,7 @@ export async function POST(context: APIContext): Promise<Response> {
 			status: 429
 		});
 	}
+
 	const data: unknown = await context.request.json();
 	const parser = new ObjectParser(data);
 	let encodedKey: string, code: string;
@@ -42,6 +43,11 @@ export async function POST(context: APIContext): Promise<Response> {
 	if (code === "") {
 		return new Response("Please enter your code", {
 			status: 400
+		});
+	}
+	if (!totpUpdateBucket.consume(context.locals.user.id, 1)) {
+		return new Response("Too many requests", {
+			status: 429
 		});
 	}
 	if (encodedKey.length !== 28) {

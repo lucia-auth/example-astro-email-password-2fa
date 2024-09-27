@@ -8,11 +8,11 @@ import {
 import { ObjectParser } from "@pilcrowjs/object-parser";
 import { updateUserEmailAndSetEmailAsVerified } from "@lib/server/user";
 import { invalidateUserPasswordResetSessions } from "@lib/server/password-reset";
-import { FixedRefillTokenBucket } from "@lib/server/rate-limit";
+import { ExpiringTokenBucket } from "@lib/server/rate-limit";
 
 import type { APIContext } from "astro";
 
-const bucket = new FixedRefillTokenBucket<number>(5, 60 * 30);
+const bucket = new ExpiringTokenBucket<number>(5, 60 * 30);
 
 export async function POST(context: APIContext): Promise<Response> {
 	if (context.locals.session === null || context.locals.user === null) {
@@ -23,6 +23,11 @@ export async function POST(context: APIContext): Promise<Response> {
 	if (context.locals.user.registered2FA && !context.locals.session.twoFactorVerified) {
 		return new Response(null, {
 			status: 401
+		});
+	}
+	if (!bucket.check(context.locals.user.id, 1)) {
+		return new Response("Too many requests", {
+			status: 429
 		});
 	}
 
@@ -47,7 +52,7 @@ export async function POST(context: APIContext): Promise<Response> {
 			status: 400
 		});
 	}
-	if (!bucket.check(context.locals.user.id, 1)) {
+	if (!bucket.consume(context.locals.user.id, 1)) {
 		return new Response("Too many requests", {
 			status: 429
 		});

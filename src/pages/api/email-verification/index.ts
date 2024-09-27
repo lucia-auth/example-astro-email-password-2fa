@@ -20,6 +20,11 @@ export async function POST(context: APIContext): Promise<Response> {
 			status: 401
 		});
 	}
+	if (!sendVerificationEmailBucket.check(context.locals.user.id, 1)) {
+		return new Response("Too many requests", {
+			status: 429
+		});
+	}
 
 	const data: unknown = await context.request.json();
 	const parser = new ObjectParser(data);
@@ -47,7 +52,7 @@ export async function POST(context: APIContext): Promise<Response> {
 			status: 400
 		});
 	}
-	if (!sendVerificationEmailBucket.check(context.locals.user.id, 1)) {
+	if (!sendVerificationEmailBucket.consume(context.locals.user.id, 1)) {
 		return new Response("Too many requests", {
 			status: 429
 		});

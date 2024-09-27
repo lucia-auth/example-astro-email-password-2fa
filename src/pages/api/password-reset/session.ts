@@ -12,9 +12,18 @@ import { generateSessionToken } from "@lib/server/session";
 
 import type { APIContext } from "astro";
 
-const bucket = new ConstantRefillTokenBucket<string>(3, 60 * 5);
+const ipBucket = new ConstantRefillTokenBucket<string>(3, 60);
+const userBucket = new ConstantRefillTokenBucket<number>(3, 60);
 
 export async function POST(context: APIContext): Promise<Response> {
+	// TODO: Assumes X-Forwarded-For is always included.
+	const clientIP = context.request.headers.get("X-Forwarded-For");
+	if (clientIP !== null && !ipBucket.check(clientIP, 1)) {
+		return new Response("Too many requests", {
+			status: 429
+		});
+	}
+
 	const data: unknown = await context.request.json();
 	const parser = new ObjectParser(data);
 	let email: string;
@@ -36,9 +45,14 @@ export async function POST(context: APIContext): Promise<Response> {
 			status: 400
 		});
 	}
-	if (!bucket.check(email, 1)) {
+	if (clientIP !== null && !ipBucket.consume(clientIP, 1)) {
 		return new Response("Too many requests", {
-			status: 400
+			status: 429
+		});
+	}
+	if (!userBucket.consume(user.id, 1)) {
+		return new Response("Too many requests", {
+			status: 429
 		});
 	}
 	invalidateUserPasswordResetSessions(user.id);

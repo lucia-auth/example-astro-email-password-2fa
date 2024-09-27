@@ -2,9 +2,10 @@ import { defineMiddleware, sequence } from "astro:middleware";
 import { ConstantRefillTokenBucket } from "@lib/server/rate-limit";
 import { deleteSessionTokenCookie, setSessionTokenCookie, validateSessionToken } from "@lib/server/session";
 
-const bucket = new ConstantRefillTokenBucket(100, 1);
+const bucket = new ConstantRefillTokenBucket<string>(100, 1);
 
 const rateLimitMiddleware = defineMiddleware((context, next) => {
+	// TODO: Assumes X-Forwarded-For is always included.
 	const clientIP = context.request.headers.get("X-Forwarded-For");
 	if (clientIP === null) {
 		return next();
@@ -13,9 +14,9 @@ const rateLimitMiddleware = defineMiddleware((context, next) => {
 	if (context.request.method === "GET" || context.request.method === "OPTIONS") {
 		cost = 1;
 	} else {
-		cost = 2;
+		cost = 3;
 	}
-	if (!bucket.check(clientIP, cost)) {
+	if (!bucket.consume(clientIP, cost)) {
 		return new Response("Too many requests", {
 			status: 429
 		});

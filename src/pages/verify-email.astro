@@ -14,6 +14,7 @@ if (verificationRequest === null || Date.now() >= verificationRequest.expiresAt.
 	if (Astro.locals.user.emailVerified) {
 		return Astro.redirect("/");
 	}
+	// Note: We don't need rate limiting since it takes time before requests expire
 	verificationRequest = createEmailVerificationRequest(Astro.locals.user.id, Astro.locals.user.email);
 	sendVerificationEmail(verificationRequest.email, verificationRequest.code);
 	setEmailVerificationRequestCookie(Astro, verificationRequest);
