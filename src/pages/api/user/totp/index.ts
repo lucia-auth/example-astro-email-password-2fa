@@ -3,9 +3,11 @@ import { verifyTOTP } from "@oslojs/otp";
 import { updateUserTOTPKey } from "@lib/server/user";
 import { ObjectParser } from "@pilcrowjs/object-parser";
 import { setSessionAs2FAVerified } from "@lib/server/session";
-import { totpUpdateBucket } from "@lib/server/2fa";
+import { RefillingTokenBucket } from "@lib/server/rate-limit";
 
 import type { APIContext } from "astro";
+
+const totpUpdateBucket = new RefillingTokenBucket<number>(3, 60 * 10);
 
 export async function POST(context: APIContext): Promise<Response> {
 	if (context.locals.session === null || context.locals.user === null) {
