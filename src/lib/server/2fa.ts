@@ -3,9 +3,9 @@ import { decryptToString, encryptString } from "./encryption";
 import { ConstantRefillTokenBucket, ExpiringTokenBucket } from "./rate-limit";
 import { generateRandomRecoveryCode } from "./utils";
 
-export const totpUpdateBucket = new ConstantRefillTokenBucket<number>(5, 60);
+export const totpUpdateBucket = new ConstantRefillTokenBucket<number>(3, 60 * 10);
 export const totpBucket = new ExpiringTokenBucket<number>(5, 60 * 30);
-export const recoveryCodeBucket = new ExpiringTokenBucket<number>(5, 60 * 60);
+export const recoveryCodeBucket = new ExpiringTokenBucket<number>(3, 60 * 60);
 
 export function resetUser2FAWithRecoveryCode(userId: number, recoveryCode: string): boolean {
 	// Note: In Postgres and MySQL, these queries should be done in a transaction using SELECT FOR UPDATE
