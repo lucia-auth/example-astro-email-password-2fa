@@ -54,7 +54,7 @@ export async function POST(context: APIContext): Promise<Response> {
 		});
 	}
 	if (!throttler.consume(user.id)) {
-		return new Response("Too many request", {
+		return new Response("Too many requests", {
 			status: 429
 		});
 	}
