@@ -44,3 +44,4 @@ pnpm dev
 - There are some major code duplications (specifically for 2FA) to keep the codebase simple.
 - TODO: You may need to rewrite some queries and use transactions to avoid race conditions when using MySQL, Postgres, etc.
 - TODO: This project relies on the `X-Forwarded-For` header for getting the client's IP address.
+- TODO: Logging should be implemented.
