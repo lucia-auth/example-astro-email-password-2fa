@@ -1,8 +1,8 @@
 import { defineMiddleware, sequence } from "astro:middleware";
-import { ConstantRefillTokenBucket } from "@lib/server/rate-limit";
+import { RefillingTokenBucket } from "@lib/server/rate-limit";
 import { deleteSessionTokenCookie, setSessionTokenCookie, validateSessionToken } from "@lib/server/session";
 
-const bucket = new ConstantRefillTokenBucket<string>(100, 1);
+const bucket = new RefillingTokenBucket<string>(100, 1);
 
 const rateLimitMiddleware = defineMiddleware((context, next) => {
 	// TODO: Assumes X-Forwarded-For is always included.

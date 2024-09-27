@@ -8,12 +8,12 @@ import {
 	sendVerificationEmail,
 	setEmailVerificationRequestCookie
 } from "@lib/server/email-verification";
-import { ConstantRefillTokenBucket } from "@lib/server/rate-limit";
+import { RefillingTokenBucket } from "@lib/server/rate-limit";
 
 import type { APIContext } from "astro";
 import type { SessionFlags } from "@lib/server/session";
 
-const ipBucket = new ConstantRefillTokenBucket<string>(3, 10);
+const ipBucket = new RefillingTokenBucket<string>(3, 10);
 
 export async function POST(context: APIContext): Promise<Response> {
 	// TODO: Assumes X-Forwarded-For is always included.

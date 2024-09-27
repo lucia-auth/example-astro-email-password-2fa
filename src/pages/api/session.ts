@@ -2,7 +2,7 @@ import { ObjectParser } from "@pilcrowjs/object-parser";
 import { verifyPasswordHash } from "@lib/server/password";
 import { createSession, generateSessionToken, setSessionTokenCookie } from "@lib/server/session";
 import { verifyEmailInput } from "@lib/server/email";
-import { ConstantRefillTokenBucket, Throttler } from "@lib/server/rate-limit";
+import { RefillingTokenBucket, Throttler } from "@lib/server/rate-limit";
 import { getUserFromEmail, getUserPasswordHash } from "@lib/server/user";
 import { invalidateSession, deleteSessionTokenCookie } from "@lib/server/session";
 
@@ -10,7 +10,7 @@ import type { APIContext } from "astro";
 import type { SessionFlags } from "@lib/server/session";
 
 const throttler = new Throttler<number>([0, 1, 2, 4, 8, 16, 30, 60, 180, 300]);
-const ipBucket = new ConstantRefillTokenBucket<string>(20, 1);
+const ipBucket = new RefillingTokenBucket<string>(20, 1);
 
 export async function POST(context: APIContext): Promise<Response> {
 	// TODO: Assumes X-Forwarded-For is always included.

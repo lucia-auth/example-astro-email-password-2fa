@@ -7,13 +7,13 @@ import {
 	sendPasswordResetEmail,
 	setPasswordResetSessionTokenCookie
 } from "@lib/server/password-reset";
-import { ConstantRefillTokenBucket } from "@lib/server/rate-limit";
+import { RefillingTokenBucket } from "@lib/server/rate-limit";
 import { generateSessionToken } from "@lib/server/session";
 
 import type { APIContext } from "astro";
 
-const ipBucket = new ConstantRefillTokenBucket<string>(3, 60);
-const userBucket = new ConstantRefillTokenBucket<number>(3, 60);
+const ipBucket = new RefillingTokenBucket<string>(3, 60);
+const userBucket = new RefillingTokenBucket<number>(3, 60);
 
 export async function POST(context: APIContext): Promise<Response> {
 	// TODO: Assumes X-Forwarded-For is always included.

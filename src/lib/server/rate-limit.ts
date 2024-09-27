@@ -1,4 +1,4 @@
-export class ConstantRefillTokenBucket<_Key> {
+export class RefillingTokenBucket<_Key> {
 	public max: number;
 	public refillIntervalSeconds: number;
 
