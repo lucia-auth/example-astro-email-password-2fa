@@ -33,8 +33,8 @@ export async function POST(context: APIContext): Promise<Response> {
 
 	let verificationRequest = getUserEmailVerificationRequestFromRequest(context);
 	if (verificationRequest === null) {
-		return new Response("Not authenticated", {
-			status: 401
+		return new Response("Forbidden", {
+			status: 403
 		});
 	}
 	const data = await context.request.json();
