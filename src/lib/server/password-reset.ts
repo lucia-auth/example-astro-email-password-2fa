@@ -31,7 +31,7 @@ export function validatePasswordResetSessionToken(token: string): PasswordResetS
 	const sessionId = encodeHexLowerCase(sha256(new TextEncoder().encode(token)));
 	const row = db.queryOne(
 		`SELECT password_reset_session.id, password_reset_session.user_id, password_reset_session.email, password_reset_session.code, password_reset_session.expires_at, password_reset_session.email_verified, password_reset_session.two_factor_verified,
-user.id, user.email, user.username, user.email_verified
+user.id, user.email, user.username, user.email_verified, IIF(user.totp_key IS NOT NULL, 1, 0)
 FROM password_reset_session INNER JOIN user ON user.id = password_reset_session.user_id
 WHERE password_reset_session.id = ?`,
 		[sessionId]
