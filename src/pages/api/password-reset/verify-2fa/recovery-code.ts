@@ -7,9 +7,14 @@ import type { APIContext } from "astro";
 
 export async function POST(context: APIContext): Promise<Response> {
 	const { session } = validatePasswordResetSessionRequest(context);
-	if (session === null || !session.emailVerified) {
-		return new Response(null, {
+	if (session === null) {
+		return new Response("Not authenticated", {
 			status: 401
+		});
+	}
+	if (!session.emailVerified) {
+		return new Response("Forbidden", {
+			status: 403
 		});
 	}
 	if (!recoveryCodeBucket.check(session.userId, 1)) {

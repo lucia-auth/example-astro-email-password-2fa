@@ -16,13 +16,13 @@ const bucket = new ExpiringTokenBucket<number>(5, 60 * 30);
 
 export async function POST(context: APIContext): Promise<Response> {
 	if (context.locals.session === null || context.locals.user === null) {
-		return new Response(null, {
+		return new Response("Not authenticated", {
 			status: 401
 		});
 	}
 	if (context.locals.user.registered2FA && !context.locals.session.twoFactorVerified) {
-		return new Response(null, {
-			status: 401
+		return new Response("Forbidden", {
+			status: 403
 		});
 	}
 	if (!bucket.check(context.locals.user.id, 1)) {
@@ -33,7 +33,7 @@ export async function POST(context: APIContext): Promise<Response> {
 
 	let verificationRequest = getUserEmailVerificationRequestFromRequest(context);
 	if (verificationRequest === null) {
-		return new Response(null, {
+		return new Response("Not authenticated", {
 			status: 401
 		});
 	}

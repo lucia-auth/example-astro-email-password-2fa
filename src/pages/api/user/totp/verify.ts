@@ -8,17 +8,17 @@ import type { APIContext } from "astro";
 
 export async function POST(context: APIContext): Promise<Response> {
 	if (context.locals.session === null || context.locals.user === null) {
-		return new Response(null, {
+		return new Response("Not authenticated", {
 			status: 401
 		});
 	}
 	if (!context.locals.user.emailVerified) {
-		return new Response(null, {
+		return new Response("Forbidden", {
 			status: 403
 		});
 	}
 	if (!context.locals.user.registered2FA) {
-		return new Response(null, {
+		return new Response("Forbidden", {
 			status: 403
 		});
 	}
@@ -50,7 +50,7 @@ export async function POST(context: APIContext): Promise<Response> {
 	}
 	const totpKey = getUserTOTPKey(context.locals.user.id);
 	if (totpKey === null) {
-		return new Response(null, {
+		return new Response("Forbidden", {
 			status: 403
 		});
 	}

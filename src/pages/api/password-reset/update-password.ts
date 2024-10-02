@@ -18,13 +18,18 @@ import type { SessionFlags } from "@lib/server/session";
 
 export async function POST(context: APIContext): Promise<Response> {
 	const { session: passwordResetSession, user } = validatePasswordResetSessionRequest(context);
-	if (passwordResetSession === null || !passwordResetSession.emailVerified) {
-		return new Response(null, {
+	if (passwordResetSession === null) {
+		return new Response("Not authenticated", {
 			status: 401
 		});
 	}
+	if (!passwordResetSession.emailVerified) {
+		return new Response("Forbidden", {
+			status: 403
+		});
+	}
 	if (user.registered2FA && !passwordResetSession.twoFactorVerified) {
-		return new Response(null, {
+		return new Response("Forbidden", {
 			status: 403
 		});
 	}

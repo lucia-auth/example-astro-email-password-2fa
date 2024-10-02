@@ -13,7 +13,7 @@ const bucket = new ExpiringTokenBucket<number>(5, 60 * 30);
 export async function POST(context: APIContext): Promise<Response> {
 	const { session } = validatePasswordResetSessionRequest(context);
 	if (session === null) {
-		return new Response(null, {
+		return new Response("Not authenticated", {
 			status: 401
 		});
 	}

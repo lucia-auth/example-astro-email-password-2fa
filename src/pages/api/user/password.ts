@@ -13,17 +13,17 @@ import type { SessionFlags } from "@lib/server/session";
 
 export async function PATCH(context: APIContext): Promise<Response> {
 	if (context.locals.user === null || context.locals.session === null) {
-		return new Response(null, {
+		return new Response("Not authenticated", {
 			status: 401
 		});
 	}
 	if (!context.locals.user.emailVerified) {
-		return new Response(null, {
+		return new Response("Forbidden", {
 			status: 403
 		});
 	}
 	if (context.locals.user.registered2FA && !context.locals.session.twoFactorVerified) {
-		return new Response(null, {
+		return new Response("Forbidden", {
 			status: 403
 		});
 	}
