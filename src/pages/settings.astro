@@ -46,7 +46,7 @@ if (Astro.locals.user.registered2FA) {
 					<input
 						type="password"
 						id="form-password.new-password"
-						name="new-password"
+						name="new_password"
 						autocomplete="new-password"
 						required
 					/><br />
@@ -104,7 +104,7 @@ if (Astro.locals.user.registered2FA) {
 		const formData = new FormData(e.target as HTMLFormElement);
 		const data = {
 			password: formData.get("password"),
-			new_password: formData.get("new-password")
+			new_password: formData.get("new_password")
 		};
 		const response = await fetch("/api/user/password", {
 			method: "PATCH",
