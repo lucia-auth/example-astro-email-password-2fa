@@ -20,11 +20,6 @@ export async function PATCH(context: APIContext): Promise<Response> {
 			status: 401
 		});
 	}
-	if (!context.locals.user.emailVerified) {
-		return new Response("Forbidden", {
-			status: 403
-		});
-	}
 	if (context.locals.user.registered2FA && !context.locals.session.twoFactorVerified) {
 		return new Response("Forbidden", {
 			status: 403
@@ -65,6 +60,7 @@ export async function PATCH(context: APIContext): Promise<Response> {
 			status: 400
 		});
 	}
+	bucket.reset(context.locals.session.id);
 	invalidateUserSessions(context.locals.user.id);
 	await updateUserPassword(context.locals.user.id, newPassword);
 
