@@ -12,12 +12,11 @@ export async function POST(context: APIContext): Promise<Response> {
 			status: 401
 		});
 	}
-	if (!context.locals.user.emailVerified) {
-		return new Response("Forbidden", {
-			status: 403
-		});
-	}
-	if (!context.locals.user.registered2FA) {
+	if (
+		!context.locals.user.emailVerified ||
+		!context.locals.user.registered2FA ||
+		context.locals.session.twoFactorVerified
+	) {
 		return new Response("Forbidden", {
 			status: 403
 		});

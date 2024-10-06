@@ -6,13 +6,13 @@ import { recoveryCodeBucket } from "@lib/server/2fa";
 import type { APIContext } from "astro";
 
 export async function POST(context: APIContext): Promise<Response> {
-	const { session } = validatePasswordResetSessionRequest(context);
+	const { session, user } = validatePasswordResetSessionRequest(context);
 	if (session === null) {
 		return new Response("Not authenticated", {
 			status: 401
 		});
 	}
-	if (!session.emailVerified) {
+	if (!session.emailVerified || !user.registered2FA || session.twoFactorVerified) {
 		return new Response("Forbidden", {
 			status: 403
 		});
@@ -20,11 +20,6 @@ export async function POST(context: APIContext): Promise<Response> {
 	if (!recoveryCodeBucket.check(session.userId, 1)) {
 		return new Response("Too many requests", {
 			status: 429
-		});
-	}
-	if (session.twoFactorVerified) {
-		return new Response("Already verified", {
-			status: 400
 		});
 	}
 
