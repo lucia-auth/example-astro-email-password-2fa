@@ -83,9 +83,8 @@ export function getUserEmailVerificationRequestFromRequest(context: APIContext):
 		return null;
 	}
 	const request = getUserEmailVerificationRequest(context.locals.user.id, id);
-	if (request !== null) {
+	if (request === null) {
 		deleteEmailVerificationRequestCookie(context);
-		return null;
 	}
 	return request;
 }
