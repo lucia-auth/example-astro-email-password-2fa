@@ -32,11 +32,13 @@ const authMiddleware = defineMiddleware((context, next) => {
 		return next();
 	}
 	const { user, session } = validateSessionToken(token);
-	if (session !== null) {
-		setSessionTokenCookie(context, token, session.expiresAt);
-	} else {
+	if (session === null) {
 		deleteSessionTokenCookie(context);
-	}
+		context.locals.session = null;
+		context.locals.user = null;
+		return next();
+	} 
+	
 	context.locals.session = session;
 	context.locals.user = user;
 	return next();
