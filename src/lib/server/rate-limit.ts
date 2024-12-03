@@ -1,4 +1,4 @@
-export class RefillingTokenBucket<_Key> {
+export class TokenBucketRateLimit<_Key> {
 	public max: number;
 	public refillIntervalSeconds: number;
 
@@ -7,7 +7,7 @@ export class RefillingTokenBucket<_Key> {
 		this.refillIntervalSeconds = refillIntervalSeconds;
 	}
 
-	private storage = new Map<_Key, RefillBucket>();
+	private storage = new Map<_Key, RefillingTokenBucket>();
 
 	public check(key: _Key, cost: number): boolean {
 		const bucket = this.storage.get(key) ?? null;
@@ -16,10 +16,8 @@ export class RefillingTokenBucket<_Key> {
 		}
 		const now = Date.now();
 		const refill = Math.floor((now - bucket.refilledAt) / (this.refillIntervalSeconds * 1000));
-		if (refill > 0) {
-			return Math.min(bucket.count + refill, this.max) >= cost;
-		}
-		return bucket.count >= cost;
+		const count = Math.min(bucket.count + refill, this.max);
+		return count >= cost;
 	}
 
 	public consume(key: _Key, cost: number): boolean {
@@ -35,7 +33,7 @@ export class RefillingTokenBucket<_Key> {
 		}
 		const refill = Math.floor((now - bucket.refilledAt) / (this.refillIntervalSeconds * 1000));
 		bucket.count = Math.min(bucket.count + refill, this.max);
-		bucket.refilledAt = now;
+		bucket.refilledAt = bucket.refilledAt + refill * this.refillIntervalSeconds;
 		if (bucket.count < cost) {
 			return false;
 		}
@@ -45,83 +43,47 @@ export class RefillingTokenBucket<_Key> {
 	}
 }
 
-export class Throttler<_Key> {
-	public timeoutSeconds: number[];
-
-	private storage = new Map<_Key, ThrottlingCounter>();
-
-	constructor(timeoutSeconds: number[]) {
-		this.timeoutSeconds = timeoutSeconds;
-	}
-
-	public consume(key: _Key): boolean {
-		let counter = this.storage.get(key) ?? null;
-		const now = Date.now();
-		if (counter === null) {
-			counter = {
-				timeout: 0,
-				updatedAt: now
-			};
-			this.storage.set(key, counter);
-			return true;
-		}
-		const allowed = now - counter.updatedAt >= this.timeoutSeconds[counter.timeout] * 1000;
-		if (!allowed) {
-			return false;
-		}
-		counter.updatedAt = now;
-		counter.timeout = Math.min(counter.timeout + 1, this.timeoutSeconds.length - 1);
-		this.storage.set(key, counter);
-		return true;
-	}
-
-	public reset(key: _Key): void {
-		this.storage.delete(key);
-	}
-}
-
-export class ExpiringTokenBucket<_Key> {
+export class BasicRateLimit<_Key> {
 	public max: number;
-	public expiresInSeconds: number;
+	public windowSizeInSeconds: number;
 
-	private storage = new Map<_Key, ExpiringBucket>();
+	private storage = new Map<_Key, BasicRateLimitRecord>();
 
-	constructor(max: number, expiresInSeconds: number) {
+	constructor(max: number, windowSizeInSeconds: number) {
 		this.max = max;
-		this.expiresInSeconds = expiresInSeconds;
+		this.windowSizeInSeconds = windowSizeInSeconds;
 	}
 
 	public check(key: _Key, cost: number): boolean {
-		const bucket = this.storage.get(key) ?? null;
-		const now = Date.now();
-		if (bucket === null) {
+		const record = this.storage.get(key) ?? null;
+		if (record === null) {
 			return true;
 		}
-		if (now - bucket.createdAt >= this.expiresInSeconds * 1000) {
+		if (Date.now() - record.startsAt >= this.windowSizeInSeconds * 1000) {
 			return true;
 		}
-		return bucket.count >= cost;
+		return record.count >= cost;
 	}
 
 	public consume(key: _Key, cost: number): boolean {
-		let bucket = this.storage.get(key) ?? null;
+		let record = this.storage.get(key) ?? null;
 		const now = Date.now();
-		if (bucket === null) {
-			bucket = {
+		if (record === null) {
+			record = {
 				count: this.max - cost,
-				createdAt: now
+				startsAt: now
 			};
-			this.storage.set(key, bucket);
+			this.storage.set(key, record);
 			return true;
 		}
-		if (now - bucket.createdAt >= this.expiresInSeconds * 1000) {
-			bucket.count = this.max;
+		if (now - record.startsAt >= this.windowSizeInSeconds * 1000) {
+			record.count = this.max;
 		}
-		if (bucket.count < cost) {
+		if (record.count < cost) {
 			return false;
 		}
-		bucket.count -= cost;
-		this.storage.set(key, bucket);
+		record.count -= cost;
+		this.storage.set(key, record);
 		return true;
 	}
 
@@ -130,17 +92,33 @@ export class ExpiringTokenBucket<_Key> {
 	}
 }
 
-interface RefillBucket {
+export class Counter<_Key> {
+	public max: number;
+
+	private storage = new Map<_Key, number>();
+
+	constructor(max: number) {
+		this.max = max;
+	}
+
+	public increment(key: _Key): boolean {
+		let count = this.storage.get(key) ?? 0;
+		if (count > this.max) {
+			this.storage.delete(key);
+			return false;
+		}
+		count++;
+		this.storage.set(key, count);
+		return true;
+	}
+}
+
+interface RefillingTokenBucket {
 	count: number;
 	refilledAt: number;
 }
 
-interface ExpiringBucket {
+interface BasicRateLimitRecord {
 	count: number;
-	createdAt: number;
-}
-
-interface ThrottlingCounter {
-	timeout: number;
-	updatedAt: number;
+	startsAt: number;
 }

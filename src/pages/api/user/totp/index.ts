@@ -3,11 +3,8 @@ import { verifyTOTP } from "@oslojs/otp";
 import { updateUserTOTPKey } from "@lib/server/user";
 import { ObjectParser } from "@pilcrowjs/object-parser";
 import { setSessionAs2FAVerified } from "@lib/server/session";
-import { RefillingTokenBucket } from "@lib/server/rate-limit";
 
 import type { APIContext } from "astro";
-
-const totpUpdateBucket = new RefillingTokenBucket<number>(3, 60 * 10);
 
 export async function POST(context: APIContext): Promise<Response> {
 	if (context.locals.session === null || context.locals.user === null) {
@@ -15,19 +12,9 @@ export async function POST(context: APIContext): Promise<Response> {
 			status: 401
 		});
 	}
-	if (!context.locals.user.emailVerified) {
-		return new Response("Forbidden", {
-			status: 403
-		});
-	}
 	if (context.locals.user.registered2FA && !context.locals.session.twoFactorVerified) {
 		return new Response("Forbidden", {
 			status: 403
-		});
-	}
-	if (!totpUpdateBucket.check(context.locals.user.id, 1)) {
-		return new Response("Too many requests", {
-			status: 429
 		});
 	}
 
@@ -45,11 +32,6 @@ export async function POST(context: APIContext): Promise<Response> {
 	if (code === "") {
 		return new Response("Please enter your code", {
 			status: 400
-		});
-	}
-	if (!totpUpdateBucket.consume(context.locals.user.id, 1)) {
-		return new Response("Too many requests", {
-			status: 429
 		});
 	}
 	if (encodedKey.length !== 28) {

@@ -6,9 +6,6 @@ import { renderSVG } from "uqr";
 if (Astro.locals.user === null || Astro.locals.session === null) {
 	return Astro.redirect("/login");
 }
-if (!Astro.locals.user.emailVerified) {
-	return Astro.redirect("/verify-email");
-}
 if (Astro.locals.user.registered2FA && !Astro.locals.session.twoFactorVerified) {
 	return Astro.redirect("/2fa");
 }

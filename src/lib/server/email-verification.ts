@@ -1,44 +1,36 @@
 import { generateRandomOTP } from "./utils";
 import { db } from "./db";
-import { ExpiringTokenBucket } from "./rate-limit";
-import { encodeBase32 } from "@oslojs/encoding";
+import { Counter, TokenBucketRateLimit } from "./rate-limit";
 
 import type { APIContext } from "astro";
 
-export function getUserEmailVerificationRequest(userId: number, id: string): EmailVerificationRequest | null {
-	const row = db.queryOne(
-		"SELECT id, user_id, code, email, expires_at FROM email_verification_request WHERE id = ? AND user_id = ?",
-		[id, userId]
-	);
-	if (row === null) {
-		return row;
-	}
-	const request: EmailVerificationRequest = {
-		id: row.string(0),
-		userId: row.number(1),
-		code: row.string(2),
-		email: row.string(3),
-		expiresAt: new Date(row.number(4) * 1000)
-	};
-	return request;
-}
+export const sessionEmailVerificationCounter = new Counter<string>(5);
+export const userVerificationEmailRateLimit = new TokenBucketRateLimit<number>(5, 60 * 10);
 
-export function createEmailVerificationRequest(userId: number, email: string): EmailVerificationRequest {
-	deleteUserEmailVerificationRequest(userId);
-	const idBytes = new Uint8Array(20);
-	crypto.getRandomValues(idBytes);
-	const id = encodeBase32(idBytes).toLowerCase();
-
+export function createSessionEmailVerificationRequest(
+	sessionId: string,
+	email: string
+): SessionEmailVerificationRequest {
 	const code = generateRandomOTP();
 	const expiresAt = new Date(Date.now() + 1000 * 60 * 10);
-	db.queryOne(
-		"INSERT INTO email_verification_request (id, user_id, code, email, expires_at) VALUES (?, ?, ?, ?, ?) RETURNING id",
-		[id, userId, code, email, Math.floor(expiresAt.getTime() / 1000)]
+	db.execute(
+		`INSERT INTO session_email_verification_request (session_id, expires_at, email, code) VALUES (?, ?, ?, ?)
+ON CONFLICT (session_id)
+DO UPDATE SET expires_at = ?, email = ?, code = ? WHERE session_id = ?`,
+		[
+			sessionId,
+			Math.floor(expiresAt.getTime() / 1000),
+			email,
+			code,
+			Math.floor(expiresAt.getTime() / 1000),
+			email,
+			code,
+			sessionId
+		]
 	);
 
-	const request: EmailVerificationRequest = {
-		id,
-		userId,
+	const request: SessionEmailVerificationRequest = {
+		sessionId,
 		code,
 		email,
 		expiresAt
@@ -46,22 +38,42 @@ export function createEmailVerificationRequest(userId: number, email: string): E
 	return request;
 }
 
-export function deleteUserEmailVerificationRequest(userId: number): void {
-	db.execute("DELETE FROM email_verification_request WHERE user_id = ?", [userId]);
+export function getSessionEmailVerificationRequest(sessionId: string): SessionEmailVerificationRequest | null {
+	const row = db.queryOne(
+		"SELECT session_id, expires_at, email, code FROM session_email_verification_request WHERE session_id = ?",
+		[sessionId]
+	);
+	if (row === null) {
+		return null;
+	}
+	const request: SessionEmailVerificationRequest = {
+		sessionId: row.string(0),
+		expiresAt: new Date(row.number(1) * 1000),
+		email: row.string(2),
+		code: row.string(3)
+	};
+	if (Date.now() >= request.expiresAt.getTime()) {
+		deleteSessionEmailVerificationRequest(request.sessionId);
+		return null;
+	}
+	return request;
+}
+
+export function deleteSessionEmailVerificationRequest(sessionId: string): void {
+	db.execute("DELETE FROM session_email_verification_request WHERE session_id = ?", [sessionId]);
+}
+
+export function deleteUserEmailVerificationRequests(userId: number): void {
+	db.execute(
+		`DELETE FROM session_email_verification_request WHERE session_id IN (
+SELECT id FROM session WHERE user_id = ?
+)`,
+		[userId]
+	);
 }
 
 export function sendVerificationEmail(email: string, code: string): void {
 	console.log(`To ${email}: Your verification code is ${code}`);
-}
-
-export function setEmailVerificationRequestCookie(context: APIContext, request: EmailVerificationRequest): void {
-	context.cookies.set("email_verification", request.id, {
-		httpOnly: true,
-		path: "/",
-		secure: import.meta.env.PROD,
-		sameSite: "lax",
-		expires: request.expiresAt
-	});
 }
 
 export function deleteEmailVerificationRequestCookie(context: APIContext): void {
@@ -74,27 +86,9 @@ export function deleteEmailVerificationRequestCookie(context: APIContext): void 
 	});
 }
 
-export function getUserEmailVerificationRequestFromRequest(context: APIContext): EmailVerificationRequest | null {
-	if (context.locals.user === null) {
-		return null;
-	}
-	const id = context.cookies.get("email_verification")?.value ?? null;
-	if (id === null) {
-		return null;
-	}
-	const request = getUserEmailVerificationRequest(context.locals.user.id, id);
-	if (request === null) {
-		deleteEmailVerificationRequestCookie(context);
-	}
-	return request;
-}
-
-export const sendVerificationEmailBucket = new ExpiringTokenBucket<number>(3, 60 * 10);
-
-export interface EmailVerificationRequest {
-	id: string;
-	userId: number;
-	code: string;
-	email: string;
+export interface SessionEmailVerificationRequest {
+	sessionId: string;
 	expiresAt: Date;
+	email: string;
+	code: string;
 }

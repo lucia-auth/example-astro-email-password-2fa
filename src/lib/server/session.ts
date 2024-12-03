@@ -8,8 +8,7 @@ import type { APIContext } from "astro";
 export function validateSessionToken(token: string): SessionValidationResult {
 	const sessionId = encodeHexLowerCase(sha256(new TextEncoder().encode(token)));
 	const row = db.queryOne(
-		`
-SELECT session.id, session.user_id, session.expires_at, session.two_factor_verified, user.id, user.email, user.username, user.email_verified, IIF(user.totp_key IS NOT NULL, 1, 0) FROM session
+		`SELECT session.id, session.user_id, session.expires_at, session.two_factor_verified, user.id, user.email, user.username, IIF(user.totp_key IS NOT NULL, 1, 0) FROM session
 INNER JOIN user ON session.user_id = user.id
 WHERE session.id = ?
 `,
@@ -29,8 +28,7 @@ WHERE session.id = ?
 		id: row.number(4),
 		email: row.string(5),
 		username: row.string(6),
-		emailVerified: Boolean(row.number(7)),
-		registered2FA: Boolean(row.number(8))
+		registered2FA: Boolean(row.number(7))
 	};
 	if (Date.now() >= session.expiresAt.getTime()) {
 		db.execute("DELETE FROM session WHERE id = ?", [session.id]);

@@ -1,5 +1,5 @@
 import { ObjectParser } from "@pilcrowjs/object-parser";
-import { recoveryCodeBucket, resetUser2FAWithRecoveryCode } from "@lib/server/2fa";
+import { userRecoveryCodeVerificationRateLimit, resetUser2FAWithRecoveryCode } from "@lib/server/2fa";
 
 import type { APIContext } from "astro";
 
@@ -9,17 +9,12 @@ export async function POST(context: APIContext): Promise<Response> {
 			status: 401
 		});
 	}
-	if (!context.locals.user.emailVerified) {
-		return new Response("Forbidden", {
-			status: 403
-		});
-	}
 	if (!context.locals.user.registered2FA) {
 		return new Response("Forbidden", {
 			status: 403
 		});
 	}
-	if (!recoveryCodeBucket.check(context.locals.user.id, 1)) {
+	if (!userRecoveryCodeVerificationRateLimit.check(context.locals.user.id, 1)) {
 		return new Response("Too many requests", {
 			status: 429
 		});
@@ -40,7 +35,7 @@ export async function POST(context: APIContext): Promise<Response> {
 			status: 400
 		});
 	}
-	if (!recoveryCodeBucket.consume(context.locals.user.id, 1)) {
+	if (!userRecoveryCodeVerificationRateLimit.consume(context.locals.user.id, 1)) {
 		return new Response("Too many requests", {
 			status: 429
 		});
@@ -51,7 +46,7 @@ export async function POST(context: APIContext): Promise<Response> {
 			status: 400
 		});
 	}
-	recoveryCodeBucket.reset(context.locals.user.id);
+	userRecoveryCodeVerificationRateLimit.reset(context.locals.user.id);
 	return new Response(null, {
 		status: 204
 	});

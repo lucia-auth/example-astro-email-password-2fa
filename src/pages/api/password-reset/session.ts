@@ -1,24 +1,28 @@
 import { ObjectParser } from "@pilcrowjs/object-parser";
 import { verifyEmailInput } from "@lib/server/email";
 import { getUserFromEmail } from "@lib/server/user";
+import { ipPasswordHashRateLimit } from "@lib/server/password";
 import {
 	createPasswordResetSession,
 	invalidateUserPasswordResetSessions,
+	ipPasswordResetRateLimit,
 	sendPasswordResetEmail,
-	setPasswordResetSessionTokenCookie
+	setPasswordResetSessionTokenCookie,
+	userPasswordResetRateLimit
 } from "@lib/server/password-reset";
-import { RefillingTokenBucket } from "@lib/server/rate-limit";
 import { generateSessionToken } from "@lib/server/session";
 
 import type { APIContext } from "astro";
 
-const ipBucket = new RefillingTokenBucket<string>(3, 60);
-const userBucket = new RefillingTokenBucket<number>(3, 60);
-
 export async function POST(context: APIContext): Promise<Response> {
 	// TODO: Assumes X-Forwarded-For is always included.
 	const clientIP = context.request.headers.get("X-Forwarded-For");
-	if (clientIP !== null && !ipBucket.check(clientIP, 1)) {
+	if (clientIP !== null && !ipPasswordHashRateLimit.check(clientIP, 2)) {
+		return new Response("Too many requests", {
+			status: 429
+		});
+	}
+	if (clientIP !== null && !ipPasswordResetRateLimit.check(clientIP, 1)) {
 		return new Response("Too many requests", {
 			status: 429
 		});
@@ -45,20 +49,31 @@ export async function POST(context: APIContext): Promise<Response> {
 			status: 400
 		});
 	}
-	if (clientIP !== null && !ipBucket.consume(clientIP, 1)) {
+	if (!userPasswordResetRateLimit.check(user.id, 1)) {
 		return new Response("Too many requests", {
 			status: 429
 		});
 	}
-	if (!userBucket.consume(user.id, 1)) {
+
+	if (clientIP !== null && !ipPasswordHashRateLimit.consume(clientIP, 1)) {
+		return new Response("Too many requests", {
+			status: 429
+		});
+	}
+	if (clientIP !== null && !ipPasswordResetRateLimit.consume(clientIP, 1)) {
+		return new Response("Too many requests", {
+			status: 429
+		});
+	}
+	if (!userPasswordResetRateLimit.consume(user.id, 1)) {
 		return new Response("Too many requests", {
 			status: 429
 		});
 	}
 	invalidateUserPasswordResetSessions(user.id);
 	const sessionToken = generateSessionToken();
-	const session = createPasswordResetSession(sessionToken, user.id, user.email);
-	sendPasswordResetEmail(session.email, session.code);
+	const session = await createPasswordResetSession(sessionToken, user.id, user.email);
+	sendPasswordResetEmail(session.email, session.emailVerificationCode);
 	setPasswordResetSessionTokenCookie(context, sessionToken, session.expiresAt);
 	return new Response(null, {
 		status: 201

@@ -1,8 +1,8 @@
 import { defineMiddleware, sequence } from "astro:middleware";
-import { RefillingTokenBucket } from "@lib/server/rate-limit";
+import { TokenBucketRateLimit } from "@lib/server/rate-limit";
 import { deleteSessionTokenCookie, setSessionTokenCookie, validateSessionToken } from "@lib/server/session";
 
-const bucket = new RefillingTokenBucket<string>(100, 1);
+const ratelimit = new TokenBucketRateLimit<string>(100, 1);
 
 const rateLimitMiddleware = defineMiddleware((context, next) => {
 	// TODO: Assumes X-Forwarded-For is always included.
@@ -16,7 +16,7 @@ const rateLimitMiddleware = defineMiddleware((context, next) => {
 	} else {
 		cost = 3;
 	}
-	if (!bucket.consume(clientIP, cost)) {
+	if (!ratelimit.consume(clientIP, cost)) {
 		return new Response("Too many requests", {
 			status: 429
 		});

@@ -1,7 +1,7 @@
 import { verifyTOTP } from "@oslojs/otp";
 import { ObjectParser } from "@pilcrowjs/object-parser";
 import { setSessionAs2FAVerified } from "@lib/server/session";
-import { totpBucket } from "@lib/server/2fa";
+import { userTOTPVerificationRateLimit } from "@lib/server/2fa";
 import { getUserTOTPKey } from "@lib/server/user";
 
 import type { APIContext } from "astro";
@@ -12,16 +12,12 @@ export async function POST(context: APIContext): Promise<Response> {
 			status: 401
 		});
 	}
-	if (
-		!context.locals.user.emailVerified ||
-		!context.locals.user.registered2FA ||
-		context.locals.session.twoFactorVerified
-	) {
+	if (!context.locals.user.registered2FA || context.locals.session.twoFactorVerified) {
 		return new Response("Forbidden", {
 			status: 403
 		});
 	}
-	if (!totpBucket.check(context.locals.user.id, 1)) {
+	if (!userTOTPVerificationRateLimit.check(context.locals.user.id, 1)) {
 		return new Response("Too many requests", {
 			status: 429
 		});
@@ -42,7 +38,7 @@ export async function POST(context: APIContext): Promise<Response> {
 			status: 400
 		});
 	}
-	if (!totpBucket.consume(context.locals.user.id, 1)) {
+	if (!userTOTPVerificationRateLimit.consume(context.locals.user.id, 1)) {
 		return new Response("Too many requests", {
 			status: 429
 		});
@@ -58,7 +54,7 @@ export async function POST(context: APIContext): Promise<Response> {
 			status: 400
 		});
 	}
-	totpBucket.reset(context.locals.user.id);
+	userTOTPVerificationRateLimit.reset(context.locals.user.id);
 	setSessionAs2FAVerified(context.locals.session.id);
 	return new Response(null, { status: 204 });
 }

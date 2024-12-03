@@ -1,9 +1,8 @@
 import { ObjectParser } from "@pilcrowjs/object-parser";
 import {
-	createEmailVerificationRequest,
-	sendVerificationEmailBucket,
-	sendVerificationEmail,
-	setEmailVerificationRequestCookie
+	createSessionEmailVerificationRequest,
+	userVerificationEmailRateLimit,
+	sendVerificationEmail
 } from "@lib/server/email-verification";
 import { verifyEmailInput, checkEmailAvailability } from "@lib/server/email";
 
@@ -20,7 +19,7 @@ export async function POST(context: APIContext): Promise<Response> {
 			status: 403
 		});
 	}
-	if (!sendVerificationEmailBucket.check(context.locals.user.id, 1)) {
+	if (!userVerificationEmailRateLimit.check(context.locals.user.id, 1)) {
 		return new Response("Too many requests", {
 			status: 429
 		});
@@ -52,13 +51,12 @@ export async function POST(context: APIContext): Promise<Response> {
 			status: 400
 		});
 	}
-	if (!sendVerificationEmailBucket.consume(context.locals.user.id, 1)) {
+	if (!userVerificationEmailRateLimit.consume(context.locals.user.id, 1)) {
 		return new Response("Too many requests", {
 			status: 429
 		});
 	}
-	const verificationRequest = createEmailVerificationRequest(context.locals.user.id, email);
+	const verificationRequest = createSessionEmailVerificationRequest(context.locals.session.id, email);
 	sendVerificationEmail(verificationRequest.email, verificationRequest.code);
-	setEmailVerificationRequestCookie(context, verificationRequest);
 	return new Response(null, { status: 201 });
 }

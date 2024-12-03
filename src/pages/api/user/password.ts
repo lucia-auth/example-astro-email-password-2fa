@@ -1,20 +1,30 @@
 import { ObjectParser } from "@pilcrowjs/object-parser";
 import { getUserPasswordHash, updateUserPassword } from "@lib/server/user";
-import { verifyPasswordHash, verifyPasswordStrength } from "@lib/server/password";
+import {
+	verifyPasswordHash,
+	verifyPasswordStrength,
+	userUpdatePasswordRateLimit,
+	ipPasswordHashRateLimit
+} from "@lib/server/password";
 import {
 	createSession,
 	generateSessionToken,
 	invalidateUserSessions,
 	setSessionTokenCookie
 } from "@lib/server/session";
-import { ExpiringTokenBucket } from "@lib/server/rate-limit";
 
 import type { APIContext } from "astro";
 import type { SessionFlags } from "@lib/server/session";
 
-const bucket = new ExpiringTokenBucket<string>(5, 60 * 30);
-
 export async function PATCH(context: APIContext): Promise<Response> {
+	// TODO: Assumes X-Forwarded-For is always included.
+	const clientIP = context.request.headers.get("X-Forwarded-For");
+	if (clientIP !== null && !ipPasswordHashRateLimit.check(clientIP, 1)) {
+		return new Response("Too many requests", {
+			status: 429
+		});
+	}
+
 	if (context.locals.user === null || context.locals.session === null) {
 		return new Response("Not authenticated", {
 			status: 401
@@ -25,7 +35,7 @@ export async function PATCH(context: APIContext): Promise<Response> {
 			status: 403
 		});
 	}
-	if (!bucket.check(context.locals.session.id, 1)) {
+	if (!userUpdatePasswordRateLimit.check(context.locals.session.userId, 1)) {
 		return new Response("Too many requests", {
 			status: 429
 		});
@@ -48,7 +58,12 @@ export async function PATCH(context: APIContext): Promise<Response> {
 			status: 400
 		});
 	}
-	if (!bucket.consume(context.locals.session.id, 1)) {
+	if (clientIP !== null && !ipPasswordHashRateLimit.consume(clientIP, 1)) {
+		return new Response("Too many requests", {
+			status: 429
+		});
+	}
+	if (!userUpdatePasswordRateLimit.consume(context.locals.session.userId, 1)) {
 		return new Response("Too many requests", {
 			status: 429
 		});
@@ -60,7 +75,7 @@ export async function PATCH(context: APIContext): Promise<Response> {
 			status: 400
 		});
 	}
-	bucket.reset(context.locals.session.id);
+	userUpdatePasswordRateLimit.reset(context.locals.session.userId);
 	invalidateUserSessions(context.locals.user.id);
 	await updateUserPassword(context.locals.user.id, newPassword);
 

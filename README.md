@@ -13,7 +13,7 @@ Emails are just logged to the console. Rate limiting is implemented using JavaSc
 
 ## Initialize project
 
-Create `sqlite.db` and run `setup.sql`.
+Create `sqlite.db` and run `schema.sql`.
 
 ```
 sqlite3 sqlite.db

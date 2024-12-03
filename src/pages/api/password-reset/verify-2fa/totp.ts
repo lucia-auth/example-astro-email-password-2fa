@@ -2,7 +2,7 @@ import { verifyTOTP } from "@oslojs/otp";
 import { ObjectParser } from "@pilcrowjs/object-parser";
 import { getUserTOTPKey } from "@lib/server/user";
 import { validatePasswordResetSessionRequest, setPasswordResetSessionAs2FAVerified } from "@lib/server/password-reset";
-import { totpBucket } from "@lib/server/2fa";
+import { userTOTPVerificationRateLimit } from "@lib/server/2fa";
 
 import type { APIContext } from "astro";
 
@@ -18,7 +18,7 @@ export async function POST(context: APIContext): Promise<Response> {
 			status: 403
 		});
 	}
-	if (!totpBucket.check(session.userId, 1)) {
+	if (!userTOTPVerificationRateLimit.check(session.userId, 1)) {
 		return new Response("Too many requests", {
 			status: 429
 		});
@@ -45,7 +45,7 @@ export async function POST(context: APIContext): Promise<Response> {
 			status: 403
 		});
 	}
-	if (!totpBucket.consume(session.userId, 1)) {
+	if (!userTOTPVerificationRateLimit.consume(session.userId, 1)) {
 		return new Response("Too many requests", {
 			status: 429
 		});
@@ -55,7 +55,7 @@ export async function POST(context: APIContext): Promise<Response> {
 			status: 400
 		});
 	}
-	totpBucket.reset(session.userId);
+	userTOTPVerificationRateLimit.reset(session.userId);
 	setPasswordResetSessionAs2FAVerified(session.id);
 	return new Response(null, { status: 204 });
 }

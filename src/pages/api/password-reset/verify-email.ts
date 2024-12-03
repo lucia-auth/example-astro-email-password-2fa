@@ -1,19 +1,19 @@
 import {
 	validatePasswordResetSessionRequest,
-	setPasswordResetSessionAsEmailVerified
+	setPasswordResetSessionAsEmailVerified,
+	userPasswordResetVerificationRateLimit,
+	getPasswordResetSessionEmailVerificationCodeHash,
+	invalidateUserPasswordResetSessions
 } from "@lib/server/password-reset";
 import { ObjectParser } from "@pilcrowjs/object-parser";
-import { ExpiringTokenBucket } from "@lib/server/rate-limit";
-import { setUserAsEmailVerifiedIfEmailMatches } from "@lib/server/user";
+import { verifyPasswordHash } from "@lib/server/password";
 
 import type { APIContext } from "astro";
-
-const bucket = new ExpiringTokenBucket<number>(5, 60 * 30);
 
 export async function POST(context: APIContext): Promise<Response> {
 	const { session } = validatePasswordResetSessionRequest(context);
 	if (session === null) {
-		return new Response("Not authenticated", {
+		return new Response("Please restart the process", {
 			status: 401
 		});
 	}
@@ -22,7 +22,8 @@ export async function POST(context: APIContext): Promise<Response> {
 			status: 403
 		});
 	}
-	if (!bucket.check(session.userId, 1)) {
+	if (!userPasswordResetVerificationRateLimit.check(session.userId, 1)) {
+		invalidateUserPasswordResetSessions(session.userId);
 		return new Response("Too many requests", {
 			status: 429
 		});
@@ -43,23 +44,25 @@ export async function POST(context: APIContext): Promise<Response> {
 			status: 400
 		});
 	}
-	if (!bucket.consume(session.userId, 1)) {
+	if (!userPasswordResetVerificationRateLimit.consume(session.userId, 1)) {
+		invalidateUserPasswordResetSessions(session.userId);
 		return new Response("Too many requests", {
 			status: 429
 		});
 	}
-	if (code !== session.code) {
+	const hash = getPasswordResetSessionEmailVerificationCodeHash(session.id);
+	if (hash === null) {
+		return new Response("Unexpected error", {
+			status: 500
+		});
+	}
+	const validCode = await verifyPasswordHash(hash, code);
+	if (!validCode) {
 		return new Response("Incorrect code", {
 			status: 400
 		});
 	}
-	bucket.reset(session.userId);
+	userPasswordResetVerificationRateLimit.reset(session.userId);
 	setPasswordResetSessionAsEmailVerified(session.id);
-	const emailMatches = setUserAsEmailVerifiedIfEmailMatches(session.userId, session.email);
-	if (!emailMatches) {
-		return new Response("Please restart the process", {
-			status: 400
-		});
-	}
 	return new Response(null, { status: 204 });
 }

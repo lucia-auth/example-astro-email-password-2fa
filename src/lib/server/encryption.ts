@@ -10,9 +10,9 @@ export function encrypt(data: Uint8Array): Uint8Array {
 	const cipher = createCipheriv("aes-128-gcm", key, iv);
 	const encrypted = new DynamicBuffer(0);
 	encrypted.write(iv);
-	encrypted.write(cipher.update(data));
-	encrypted.write(cipher.final());
-	encrypted.write(cipher.getAuthTag());
+	encrypted.write(new Uint8Array(cipher.update(data)));
+	encrypted.write(new Uint8Array(cipher.final()));
+	encrypted.write(new Uint8Array(cipher.getAuthTag()));
 	return encrypted.bytes();
 }
 
@@ -27,8 +27,8 @@ export function decrypt(encrypted: Uint8Array): Uint8Array {
 	const decipher = createDecipheriv("aes-128-gcm", key, encrypted.slice(0, 16));
 	decipher.setAuthTag(encrypted.slice(encrypted.byteLength - 16));
 	const decrypted = new DynamicBuffer(0);
-	decrypted.write(decipher.update(encrypted.slice(16, encrypted.byteLength - 16)));
-	decrypted.write(decipher.final());
+	decrypted.write(new Uint8Array(decipher.update(encrypted.slice(16, encrypted.byteLength - 16))));
+	decrypted.write(new Uint8Array(decipher.final()));
 	return decrypted.bytes();
 }
 

@@ -1,12 +1,9 @@
 ---
-import { getSessionEmailVerificationRequest } from "@lib/server/email-verification";
+import { validateSignUpSessionRequest } from "@lib/server/signup-session";
 
-if (Astro.locals.session === null) {
-	return Astro.redirect("/login");
-}
-const verificationRequest = getSessionEmailVerificationRequest(Astro.locals.session.id);
-if (verificationRequest === null) {
-	return Astro.redirect("/settings");
+const session = validateSignUpSessionRequest(Astro);
+if (session === null) {
+	return Astro.redirect("/signup");
 }
 ---
 
@@ -19,7 +16,7 @@ if (verificationRequest === null) {
 	<body>
 		<main>
 			<h1>Verify your email address</h1>
-			<p>We sent an 8-digit code to {verificationRequest.email}.</p>
+			<p>We sent an 8-digit code to {session.email}.</p>
 			<form id="form-verify">
 				<label for="form-verify.code">Code</label>
 				<input id="form-verify.code" name="code" required />
@@ -44,7 +41,7 @@ if (verificationRequest === null) {
 		const data = {
 			code: formData.get("code")
 		};
-		const response = await fetch("/api/email-verification/verify", {
+		const response = await fetch("/api/signup/user", {
 			method: "POST",
 			body: JSON.stringify(data)
 		});
@@ -56,7 +53,7 @@ if (verificationRequest === null) {
 	});
 
 	resendButtonElement.addEventListener("click", async () => {
-		const response = await fetch("/api/email-verification/resend-code", {
+		const response = await fetch("/api/signup/resend-code", {
 			method: "POST"
 		});
 		if (response.ok) {

@@ -2,9 +2,6 @@
 if (Astro.locals.user === null || Astro.locals.session === null) {
 	return Astro.redirect("/login");
 }
-if (!Astro.locals.user.emailVerified) {
-	return Astro.redirect("/verify-email");
-}
 if (!Astro.locals.user.registered2FA) {
 	return Astro.redirect("/2fa/setup");
 }

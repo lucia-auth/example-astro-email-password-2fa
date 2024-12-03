@@ -1,8 +1,7 @@
 ---
+import { validateSignUpSessionRequest } from "@lib/server/signup-session";
+
 if (Astro.locals.session !== null && Astro.locals.user !== null) {
-	if (!Astro.locals.user.emailVerified) {
-		return Astro.redirect("/verify-email");
-	}
 	if (!Astro.locals.user.registered2FA) {
 		return Astro.redirect("/2fa/setup");
 	}
@@ -10,6 +9,11 @@ if (Astro.locals.session !== null && Astro.locals.user !== null) {
 		return Astro.redirect("/2fa");
 	}
 	return Astro.redirect("/");
+}
+
+const signupSession = validateSignUpSessionRequest(Astro);
+if (signupSession !== null) {
+	return Astro.redirect("/signup/verify-email");
 }
 ---
 
@@ -50,12 +54,12 @@ if (Astro.locals.session !== null && Astro.locals.user !== null) {
 			username: formData.get("username"),
 			password: formData.get("password")
 		};
-		const response = await fetch("/api/user", {
+		const response = await fetch("/api/signup/session", {
 			method: "POST",
 			body: JSON.stringify(data)
 		});
 		if (response.ok) {
-			window.location.href = "/verify-email";
+			window.location.href = "/signup/verify-email";
 		} else {
 			formErrorElement.innerText = await response.text();
 		}

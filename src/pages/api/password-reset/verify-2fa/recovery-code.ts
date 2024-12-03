@@ -1,7 +1,7 @@
 import { ObjectParser } from "@pilcrowjs/object-parser";
 import { resetUser2FAWithRecoveryCode } from "@lib/server/2fa";
 import { validatePasswordResetSessionRequest } from "@lib/server/password-reset";
-import { recoveryCodeBucket } from "@lib/server/2fa";
+import { userRecoveryCodeVerificationRateLimit } from "@lib/server/2fa";
 
 import type { APIContext } from "astro";
 
@@ -17,7 +17,7 @@ export async function POST(context: APIContext): Promise<Response> {
 			status: 403
 		});
 	}
-	if (!recoveryCodeBucket.check(session.userId, 1)) {
+	if (!userRecoveryCodeVerificationRateLimit.check(session.userId, 1)) {
 		return new Response("Too many requests", {
 			status: 429
 		});
@@ -38,7 +38,7 @@ export async function POST(context: APIContext): Promise<Response> {
 			status: 400
 		});
 	}
-	if (!recoveryCodeBucket.consume(session.userId, 1)) {
+	if (!userRecoveryCodeVerificationRateLimit.consume(session.userId, 1)) {
 		return new Response("Too many requests", {
 			status: 429
 		});
@@ -49,6 +49,6 @@ export async function POST(context: APIContext): Promise<Response> {
 			status: 400
 		});
 	}
-	recoveryCodeBucket.reset(session.userId);
+	userRecoveryCodeVerificationRateLimit.reset(session.userId);
 	return new Response(null, { status: 204 });
 }

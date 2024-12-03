@@ -1,45 +1,32 @@
 import { db } from "./db";
 import { decrypt, decryptToString, encrypt, encryptString } from "./encryption";
 import { hashPassword } from "./password";
+import { BasicRateLimit } from "./rate-limit";
 import { generateRandomRecoveryCode } from "./utils";
+
+export const userLoginRateLimit = new BasicRateLimit<number>(10, 60 * 10);
 
 export function verifyUsernameInput(username: string): boolean {
 	return username.length > 3 && username.length < 32 && username.trim() === username;
 }
 
-export async function createUser(email: string, username: string, password: string): Promise<User> {
-	const passwordHash = await hashPassword(password);
-	const recoveryCode = generateRandomRecoveryCode();
-	const encryptedRecoveryCode = encryptString(recoveryCode);
-	const row = db.queryOne(
-		"INSERT INTO user (email, username, password_hash, recovery_code) VALUES (?, ?, ?, ?) RETURNING user.id",
-		[email, username, passwordHash, encryptedRecoveryCode]
-	);
-	if (row === null) {
-		throw new Error("Unexpected error");
-	}
-	const user: User = {
-		id: row.number(0),
-		username,
-		email,
-		emailVerified: false,
-		registered2FA: false
-	};
-	return user;
-}
-
 export async function updateUserPassword(userId: number, password: string): Promise<void> {
 	const passwordHash = await hashPassword(password);
-	db.execute("UPDATE user SET password_hash = ? WHERE id = ?", [passwordHash, userId]);
+	try {
+		db.execute("BEGIN", []);
+		db.execute("DELETE FROM session WHERE user_id = ?", [userId]);
+		db.execute("UPDATE user SET password_hash = ? WHERE id = ?", [passwordHash, userId]);
+		db.execute("COMMIT", []);
+	} catch (e) {
+		if (db.inTransaction()) {
+			db.execute("ROLLBACK", []);
+		}
+		throw e;
+	}
 }
 
-export function updateUserEmailAndSetEmailAsVerified(userId: number, email: string): void {
-	db.execute("UPDATE user SET email = ?, email_verified = 1 WHERE id = ?", [email, userId]);
-}
-
-export function setUserAsEmailVerifiedIfEmailMatches(userId: number, email: string): boolean {
-	const result = db.execute("UPDATE user SET email_verified = 1 WHERE id = ? AND email = ?", [userId, email]);
-	return result.changes > 0;
+export function updateUserEmail(userId: number, email: string): void {
+	db.execute("UPDATE user SET email = ? WHERE id = ?", [email, userId]);
 }
 
 export function getUserPasswordHash(userId: number): string {
@@ -83,10 +70,9 @@ export function resetUserRecoveryCode(userId: number): string {
 }
 
 export function getUserFromEmail(email: string): User | null {
-	const row = db.queryOne(
-		"SELECT id, email, username, email_verified, IIF(totp_key IS NOT NULL, 1, 0) FROM user WHERE email = ?",
-		[email]
-	);
+	const row = db.queryOne("SELECT id, email, username, IIF(totp_key IS NOT NULL, 1, 0) FROM user WHERE email = ?", [
+		email
+	]);
 	if (row === null) {
 		return null;
 	}
@@ -94,8 +80,7 @@ export function getUserFromEmail(email: string): User | null {
 		id: row.number(0),
 		email: row.string(1),
 		username: row.string(2),
-		emailVerified: Boolean(row.number(3)),
-		registered2FA: Boolean(row.number(4))
+		registered2FA: Boolean(row.number(3))
 	};
 	return user;
 }
@@ -104,6 +89,5 @@ export interface User {
 	id: number;
 	email: string;
 	username: string;
-	emailVerified: boolean;
 	registered2FA: boolean;
 }

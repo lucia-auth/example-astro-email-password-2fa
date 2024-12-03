@@ -3,7 +3,6 @@ CREATE TABLE user (
     email TEXT NOT NULL UNIQUE,
     username TEXT NOT NULL,
     password_hash TEXT NOT NULL,
-    email_verified INTEGER NOT NULL DEFAULT 0,
     totp_key BLOB,
     recovery_code BLOB NOT NULL
 );
@@ -17,20 +16,28 @@ CREATE TABLE session (
     two_factor_verified INTEGER NOT NULL DEFAULT 0
 );
 
-CREATE TABLE email_verification_request (
+CREATE TABLE signup_session (
     id TEXT NOT NULL PRIMARY KEY,
-    user_id INTEGER NOT NULL REFERENCES user(id),
+    expires_at INTEGER NOT NULL,
     email TEXT NOT NULL,
-    code TEXT NOT NULL,
-    expires_at INTEGER NOT NULL
+    username TEXT NOT NULL,
+    password_hash TEXT NOT NULL,
+    email_verification_code TEXT NOT NULL
 );
 
 CREATE TABLE password_reset_session (
     id TEXT NOT NULL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES user(id),
-    email TEXT NOT NULL,
-    code TEXT NOT NULL,
     expires_at INTEGER NOT NULL,
+    email TEXT NOT NULL,
+    email_verification_code_hash TEXT NOT NULL,
     email_verified INTEGER NOT NULL NOT NULL DEFAULT 0,
     two_factor_verified INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE session_email_verification_request (
+    session_id TEXT NOT NULL PRIMARY KEY,
+    expires_at INTEGER NOT NULL,
+    email TEXT NOT NULL,
+    code TEXT NOT NULL
 );
