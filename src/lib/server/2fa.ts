@@ -1,7 +1,7 @@
 import { db } from "./db";
 import { decryptToString, encryptString } from "./encryption";
 import { BasicRateLimit } from "./rate-limit";
-import { generateRandomRecoveryCode } from "./utils";
+import { constantTimeEqualString, generateRandomRecoveryCode } from "./utils";
 
 export const userTOTPVerificationRateLimit = new BasicRateLimit<number>(5, 60 * 30);
 export const userRecoveryCodeVerificationRateLimit = new BasicRateLimit<number>(3, 60 * 60);
@@ -14,7 +14,7 @@ export function resetUser2FAWithRecoveryCode(userId: number, recoveryCode: strin
 	}
 	const encryptedRecoveryCode = row.bytes(0);
 	const userRecoveryCode = decryptToString(encryptedRecoveryCode);
-	if (recoveryCode !== userRecoveryCode) {
+	if (!constantTimeEqualString(recoveryCode, userRecoveryCode)) {
 		return false;
 	}
 

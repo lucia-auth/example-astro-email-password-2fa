@@ -7,6 +7,7 @@ import {
 	invalidateSignUpSession
 } from "@lib/server/signup-session";
 import { createSession, generateSessionToken, setSessionTokenCookie } from "@lib/server/session";
+import { constantTimeEqualString } from "@lib/server/utils";
 
 import type { APIContext } from "astro";
 import type { SessionFlags } from "@lib/server/session";
@@ -39,7 +40,7 @@ export async function POST(context: APIContext): Promise<Response> {
 			status: 429
 		});
 	}
-	if (signupSession.emailVerificationCode !== code) {
+	if (!constantTimeEqualString(signupSession.emailVerificationCode, code)) {
 		return new Response("Incorrect code.", {
 			status: 400
 		});

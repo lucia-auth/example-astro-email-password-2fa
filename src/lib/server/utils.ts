@@ -1,3 +1,4 @@
+import { constantTimeEqual } from "@oslojs/crypto/subtle";
 import { encodeBase32UpperCaseNoPadding } from "@oslojs/encoding";
 
 export function generateRandomOTP(): string {
@@ -12,4 +13,14 @@ export function generateRandomRecoveryCode(): string {
 	crypto.getRandomValues(recoveryCodeBytes);
 	const recoveryCode = encodeBase32UpperCaseNoPadding(recoveryCodeBytes);
 	return recoveryCode;
+}
+
+export function constantTimeEqualString(a: string, b: string): boolean {
+	if (a.length !== b.length) {
+		return false;
+	}
+	const aBytes = new TextEncoder().encode(a);
+	const bBytes = new TextEncoder().encode(a);
+	const equal = constantTimeEqual(aBytes, bBytes);
+	return equal;
 }

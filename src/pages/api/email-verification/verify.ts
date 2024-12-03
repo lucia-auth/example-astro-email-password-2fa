@@ -7,6 +7,7 @@ import {
 import { ObjectParser } from "@pilcrowjs/object-parser";
 import { updateUserEmail } from "@lib/server/user";
 import { invalidateUserPasswordResetSessions } from "@lib/server/password-reset";
+import { constantTimeEqualString } from "@lib/server/utils";
 
 import type { APIContext } from "astro";
 
@@ -49,7 +50,7 @@ export async function POST(context: APIContext): Promise<Response> {
 			status: 429
 		});
 	}
-	if (verificationRequest.code !== code) {
+	if (!constantTimeEqualString(verificationRequest.code, code)) {
 		return new Response("Incorrect code.", {
 			status: 400
 		});
